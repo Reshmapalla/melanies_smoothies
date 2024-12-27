@@ -53,7 +53,12 @@ if ingredients_list:
                 smoothiefroot_response = requests.get(f"https://my.smoothiefroot.com/api/fruit/{search_on}")
                 smoothiefroot_response.raise_for_status()  # Check if the request was successful
                 st.dataframe(data=smoothiefroot_response.json(), use_container_width=True)
-            except requests.RequestException as api_error:
+            except requests.HTTPError as http_err:
+                if http_err.response.status_code == 404:
+                    st.warning(f"Nutrition information for {fruit_chosen} is not available.")
+                else:
+                    st.error(f"Error fetching nutrition information for {fruit_chosen}: {http_err}")
+            except Exception as api_error:
                 st.error(f"Error fetching nutrition information for {fruit_chosen}: {api_error}")
         else:
             st.error(f"No search value found for {fruit_chosen}.")
@@ -69,6 +74,7 @@ if ingredients_list:
             st.success('Your Smoothie is ordered!', icon="✅")
         except Exception as e:
             st.error(f"Error submitting your order: {e}")
+
 
 
 # import streamlit as st
