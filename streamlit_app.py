@@ -20,7 +20,7 @@ st.write("The name on your Smoothie will be:", name_on_order)
 
 # Retrieve fruit options for customization
 try:
-    fruit_options_df = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME')).collect()
+    fruit_options_df = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'),col('SEARCH_ON'))
     fruit_names = [row['FRUIT_NAME'] for row in fruit_options_df]  # Extract fruit names
 except Exception as e:
     st.error(f"Error fetching fruit options: {e}")
@@ -40,6 +40,7 @@ if ingredients_list:
         st.subheader(fruit_chosen+'Nutrition Information')
         smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/"+fruit_chosen)
         sf_df=st.dataframe(data=smoothiefroot_response.json(), use_container_width=True)
+        st.stop()
 
     # Insert order into the database
     my_insert_stmt = f"""
