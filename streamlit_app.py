@@ -37,7 +37,8 @@ if ingredients_list:
     ingredients_string = ', '.join(ingredients_list)  # Create a comma-separated string of ingredients
     for fruit_chosen in ingredients_list:
         ingredients_string+=fruit_chosen + ' '
-        smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/watermelon")
+        st.subheader(fruit_chosen+'Nutrition Information')
+        smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/"+fruit_chosen)
         sf_df=st.dataframe(data=smoothiefroot_response.json(), use_container_width=True)
 
     # Insert order into the database
