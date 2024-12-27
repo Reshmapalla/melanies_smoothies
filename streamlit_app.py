@@ -68,79 +68,72 @@
 #         except Exception as e:
 #             st.error(f"Error submitting your order: {e}")
 
-
 import streamlit as st
 from snowflake.snowpark.functions import col
 import requests
-
-# Title for the app
+ 
+# Write directly to the app
 st.title(":cup_with_straw: Customize Your Smoothie! :cup_with_straw:")
-st.write("Orders that need to be filled")
-
-# Active Snowflake session
-cnx = st.connection("snowflake")
+ 
+st.write(""" Choose the fruits you want in your custom Smoothie! """)
+ 
+# Take the name for the smoothie order
+name_on_order = st.text_input('Name on Smoothie:')
+st.write('The Name on your Smoothie will be:', name_on_order)
+ 
+# Get active session from Snowflake
+cnx=st.connection("snowflake")
 session = cnx.session()
-
-# Section for customizing smoothies
-st.header("Customize Your Smoothie")
-st.write("Choose the fruits you want in your custom Smoothie!")
-
-# Name on order input
-name_on_order = st.text_input("Name on Smoothie:")
-st.write("The name on your Smoothie will be:", name_on_order)
-
-# Retrieve fruit options for customization
-try:
-    # Fetching both FRUIT_NAME and SEARCH_ON columns from Snowflake
-    fruit_options_df = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'), col('SEARCH_ON')).collect()
-    
-    # Extracting fruit names into a list
-    fruit_names = [row['FRUIT_NAME'] for row in fruit_options_df]
-    
-except Exception as e:
-    st.error(f"Error fetching fruit options: {e}")
-    fruit_names = []
-
-# Multi-select for ingredients
+ 
+# Query the fruit options from Snowflake table
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'),col('SEARCH_ON'))
+#st.dataframe(data=my_dataframe,use_container_width=True)
+#st.stop()
+ 
+pd_df=my_dataframe.to_pandas()
+#st.dataframe(pd_df)
+#st.stop()
+ 
+# Create a multiselect for users to choose up to 5 ingredients
 ingredients_list = st.multiselect(
-    'Choose up to 5 ingredients:',
-    fruit_names,
-    max_selections=5
+    'Choose up to 5 ingredients:', my_dataframe,max_selections=5
 )
-
+ 
+# Initialize an empty string for ingredients
+ingredients_string = ''
+ 
+# If the user selects ingredients
 if ingredients_list:
-    ingredients_string = ', '.join(ingredients_list)  # Create a comma-separated string of ingredients
+    ingredients_string = ''
     for fruit_chosen in ingredients_list:
-        # Fetch the SEARCH_ON value for the chosen fruit
-        search_on = next((row['SEARCH_ON'] for row in fruit_options_df if row['FRUIT_NAME'] == fruit_chosen), None)
-        
-        # Check if a SEARCH_ON value exists
-        if search_on:
-            st.write(f'The search value for {fruit_chosen} is {search_on}.')
-            
-            st.subheader(fruit_chosen + ' Nutrition Information')
-            
-            # API call to retrieve fruit information
-            try:
-                smoothiefroot_response = requests.get(f"https://my.smoothiefroot.com/api/fruit/{search_on}")
-                smoothiefroot_response.raise_for_status()  # Check if the request was successful
-                st.dataframe(data=smoothiefroot_response.json(), use_container_width=True)
-            except requests.HTTPError as http_err:
-                st.error(f"Error fetching nutrition information for {fruit_chosen}: {http_err}")
-            except Exception as api_err:
-                st.error(f"An error occurred while fetching data for {fruit_chosen}: {api_err}")
-        else:
-            st.warning(f"No search value found for {fruit_chosen}.")
-    
-    # Insert order into the database
+        ingredients_string += fruit_chosen + ' '
+        search_on=pd_df.loc[pd_df['FRUIT_NAME'] == fruit_chosen, 'SEARCH_ON'].iloc[0]
+        #st.write('The search value for ', fruit_chosen,' is ', search_on, '.')
+        st.subheader(fruit_chosen + 'Nutrition Information')
+        smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/"+search_on)
+        sf_df=st.dataframe(data=smoothiefroot_response.json(),use_container_width=True)
+ 
+    # Create the SQL insert statement
     my_insert_stmt = f"""
-    INSERT INTO smoothies.public.orders (ingredients, name_on_order)
-    VALUES ('{ingredients_string}', '{name_on_order}')
+        INSERT INTO smoothies.public.orders(ingredients, name_on_order)
+        VALUES ('{ingredients_string}', '{name_on_order}')
     """
-    if st.button('Submit Order'):
-        try:
-            session.sql(my_insert_stmt).collect()
-            st.success('Your Smoothie is ordered!', icon="✅")
-        except Exception as e:
-            st.error(f"Error submitting your order: {e}")
-
+ 
+    # Display the SQL statement (for debugging or review purposes)
+    st.write(my_insert_stmt)
+ 
+else:
+    # Handle the case where no ingredients are selected
+    my_insert_stmt = None
+    st.write("Please choose some ingredients.")
+import requests
+smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/watermelon")
+sf_df=st.dataframe(data=smoothiefroot_response.json(),use_container_width=True)
+# Add button to submit the order
+if my_insert_stmt:  # Only show the button if the insert statement is valid
+    time_to_insert = st.button('Submit Order')
+ 
+    if time_to_insert:
+        # Execute the SQL insert statement when the button is pressed
+        session.sql(my_insert_stmt).collect()
+        st.success('Your Smoothie is ordered!', icon="✅")
